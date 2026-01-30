@@ -3,11 +3,28 @@ import threading
 from pathlib import Path
 
 import pytest
+import urllib3
 
 from minisweagent.models import GLOBAL_MODEL_STATS
 
 # Global lock for tests that modify global state - this works across threads
 _global_stats_lock = threading.Lock()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def disable_ssl_verification():
+    """Disable SSL verification for corporate proxy environments"""
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    # Monkey patch requests to disable SSL verification
+    import requests
+    original_request = requests.Session.request
+
+    def patched_request(self, *args, **kwargs):
+        kwargs.setdefault('verify', False)
+        return original_request(self, *args, **kwargs)
+
+    requests.Session.request = patched_request
 
 
 @pytest.fixture

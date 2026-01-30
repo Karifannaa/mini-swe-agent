@@ -12,11 +12,12 @@ __version__ = "1.17.3"
 
 import os
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, NotRequired, Protocol
 
 import dotenv
 from platformdirs import user_config_dir
 from rich.console import Console
+from typing_extensions import TypedDict
 
 from minisweagent.utils.log import logger
 
@@ -70,9 +71,20 @@ class Agent(Protocol):
 
     def run(self, task: str, **kwargs) -> tuple[str, str]: ...
 
+class AgentEx(Agent, Protocol):
+    summary_messages: list[dict[str, str]]
+
+
+class ToolDescription(TypedDict):
+    name: str
+    description: str
+    prompt_instruction: NotRequired[str]
+
+
 
 __all__ = [
     "Agent",
+    "AgentEx",
     "Model",
     "Environment",
     "package_dir",
@@ -80,4 +92,5 @@ __all__ = [
     "global_config_file",
     "global_config_dir",
     "logger",
+    "ToolDescription"
 ]

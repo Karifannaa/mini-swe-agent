@@ -7,7 +7,7 @@ import time
 from jinja2 import StrictUndefined, Template
 from pydantic import BaseModel
 
-from minisweagent import Environment, Model
+from minisweagent import Environment, Model, ToolDescription
 
 
 class AgentConfig(BaseModel):
@@ -20,6 +20,7 @@ class AgentConfig(BaseModel):
     action_regex: str = r"```bash\s*\n(.*?)\n```"
     step_limit: int = 0
     cost_limit: float = 3.0
+    tools: list[ToolDescription] = []
 
 
 class NonTerminatingException(Exception):
@@ -82,11 +83,12 @@ class DefaultAgent:
         """Query the LM, execute the action, return the observation."""
         return self.get_observation(self.query())
 
-    def query(self) -> dict:
+    def query(self, allowed_tools: list[ToolDescription] | None = None, messages: list[dict] | None = None) -> dict:
         """Query the model and return the response."""
+        messages = messages or self.messages
         if 0 < self.config.step_limit <= self.model.n_calls or 0 < self.config.cost_limit <= self.model.cost:
             raise LimitsExceeded()
-        response = self.model.query(self.messages)
+        response = self.model.query(messages)
         self.add_message("assistant", **response)
         return response
 

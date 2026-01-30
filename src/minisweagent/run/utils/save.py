@@ -1,9 +1,9 @@
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeGuard
 
-from minisweagent import Agent, __version__
+from minisweagent import Agent, AgentEx, __version__
 
 
 def _get_class_name_with_module(obj: Any) -> str:
@@ -12,7 +12,7 @@ def _get_class_name_with_module(obj: Any) -> str:
 
 
 def save_traj(
-    agent: Agent | None,
+    agent: Agent | AgentEx | None,
     path: Path | None,
     *,
     print_path: bool = True,
@@ -49,10 +49,16 @@ def save_traj(
         "messages": [],
         "trajectory_format": "mini-swe-agent-1",
     } | kwargs
+
+    def is_agent_with_summary_messages(obj: Agent | AgentEx) -> TypeGuard[AgentEx]:
+        return hasattr(obj, 'summary_messages')
+
     if agent is not None:
         data["info"]["model_stats"]["instance_cost"] = agent.model.cost
         data["info"]["model_stats"]["api_calls"] = agent.model.n_calls
         data["messages"] = agent.messages
+        if is_agent_with_summary_messages(agent):
+            data["summary_messages"] = agent.summary_messages
         data["info"]["config"] = {
             "agent": agent.config.model_dump(),
             "model": agent.model.config.model_dump(),

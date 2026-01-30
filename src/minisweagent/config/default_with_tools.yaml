@@ -1,4 +1,7 @@
 agent:
+  system_template_abstract: |
+    You are an assistant solving a programming task step by step.
+    Respond with brief reasoning followed by a bash command in ```bash``` block.
   system_template: |
     You are a helpful assistant that can interact with a computer.
 

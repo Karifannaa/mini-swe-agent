@@ -1,8 +1,7 @@
+from minisweagent.retrieval.bm25.index import tokenizer_tiktoken, bm25, top_k_elements
 from minisweagent import Model, ToolDescription
-from minisweagent.retrieval.bm25.index import bm25, tokenizer_tiktoken, top_k_elements
 
-
-class ToolMatch:
+class ToolMatch():
     def tool_match(self, tools: list[ToolDescription], query: str, model: Model) -> ToolDescription:
         """
         tools: list of dictionaries with 'name' and 'description'

@@ -1,28 +1,18 @@
-from typing import Any
+from typing import Any, Iterator
+from minisweagent.retrieval.bm25.index import tokenizer_tiktoken, bm25
+from minisweagent import Model, AbstractMessage
 
-from minisweagent import Model
-from minisweagent.retrieval.bm25.index import bm25, tokenizer_tiktoken
 
-
-class HistoryRetriever:
-    def retrieve(self, history: list[dict[str, Any]], query: str, model: Model | None, top_k: int = 10) -> list[dict[str, Any]]:
+class HistoryRetriever():
+    def retrieve(self, history: list[AbstractMessage], query: str, model: Model | None, top_k: int = 10) -> Iterator[AbstractMessage]:
         """Filter history using BM25 retrieval for relevant examples."""
+        if history == []:
+            return
         tokenizer = tokenizer_tiktoken
-        if not history or not query:
-            return history
-
-        # Prepare non-system messages for retrieval
-        retrieval_candidates = [
-            msg for msg in history
-            if msg.get('role') != 'system' and msg.get('content')
-        ]
-
-        if not retrieval_candidates:
-            return history
 
         # Calculate BM25 similarity scores
         query_tokens = tokenizer(query)
-        candidate_docs = [tokenizer(msg['content']) for msg in retrieval_candidates]
+        candidate_docs = [tokenizer(msg.content) for msg in history]
         relevance_scores = bm25(documents=candidate_docs, query=query_tokens)
 
         # Select top-k relevant documents
@@ -32,27 +22,32 @@ class HistoryRetriever:
         top_relevant_indices.sort(key=lambda idx: relevance_scores[idx], reverse=True)
         top_relevant_indices = top_relevant_indices[:top_k]
 
-        # Map candidates to original history positions
-        candidate_to_original_index = []
-        for i, msg in enumerate(history):
-            if msg.get('role') != 'system' and msg.get('content'):
-                candidate_to_original_index.append(i)
+        for n, msg in enumerate(iterable=history):
+            if n not in top_relevant_indices:
+                continue
+            yield msg
 
-        # Track which original messages to keep
-        preserve_indices = set()
-        for candidate_idx in top_relevant_indices:
-            original_index = candidate_to_original_index[candidate_idx]
-            preserve_indices.add(original_index)
+        # # Map candidates to original history positions
+        # candidate_to_original_index = []
+        # for i, msg in enumerate(history):
+        #     if msg.get('role') != 'system' and msg.get('content'):
+        #         candidate_to_original_index.append(i)
 
-        # Reconstruct history while preserving order and context
-        result_history = []
-        for i, msg in enumerate(history):
-            if i in preserve_indices:
-                result_history.append(msg)
-            elif msg.get('role') == 'system' and self._has_context_preserved(history, i, preserve_indices):
-                result_history.append(msg)
+        # # Track which original messages to keep
+        # preserve_indices = set()
+        # for candidate_idx in top_relevant_indices:
+        #     original_index = candidate_to_original_index[candidate_idx]
+        #     preserve_indices.add(original_index)
 
-        return result_history
+        # # Reconstruct history while preserving order and context
+        # result_history = []
+        # for i, msg in enumerate(history):
+        #     if i in preserve_indices:
+        #         result_history.append(msg)
+        #     elif msg.get('role') == 'system' and self._has_context_preserved(history, i, preserve_indices):
+        #         result_history.append(msg)
+
+        # return result_history
 
     def _has_context_preserved(self, history: list[dict[str, Any]], system_index: int, preserve_indices: set) -> bool:
         """Check if the next message after a system message should be preserved for context."""

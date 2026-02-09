@@ -1,9 +1,10 @@
 import json
 import threading
+import ssl
+import urllib3
 from pathlib import Path
 
 import pytest
-import urllib3
 
 from minisweagent.models import GLOBAL_MODEL_STATS
 

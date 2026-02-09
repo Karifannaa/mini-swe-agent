@@ -55,9 +55,13 @@ def main(
     config_spec: Path = typer.Option(DEFAULT_CONFIG, "-c", "--config", help="Path to config file"),
     output: Path | None = typer.Option(DEFAULT_OUTPUT, "-o", "--output", help="Output trajectory file"),
     exit_immediately: bool = typer.Option( False, "--exit-immediately", help="Exit immediately when the agent wants to finish instead of prompting.", rich_help_panel="Advanced"),
+    log_file: Path | None = typer.Option(None, "--log-file", help="Log file path (tail -f for live monitoring)"),
 ) -> Any:
     # fmt: on
     configure_if_first_time()
+    if log_file:
+        from minisweagent.utils.log import add_file_handler
+        add_file_handler(log_file)
     config_path = get_config_path(config_spec)
     console.print(f"Loading agent config from [bold green]'{config_path}'[/bold green]")
     config = yaml.safe_load(config_path.read_text())

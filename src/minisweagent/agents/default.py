@@ -3,6 +3,7 @@
 import re
 import subprocess
 import time
+from typing import Optional
 
 from jinja2 import StrictUndefined, Template
 from pydantic import BaseModel
@@ -20,7 +21,7 @@ class AgentConfig(BaseModel):
     action_regex: str = r"```bash\s*\n(.*?)\n```"
     step_limit: int = 0
     cost_limit: float = 3.0
-    tools: list[ToolDescription] = []
+    tools: list[ToolDescription]
 
 
 class NonTerminatingException(Exception):
@@ -57,8 +58,9 @@ class DefaultAgent:
 
     def render_template(self, template: str, **kwargs) -> str:
         template_vars = self.config.model_dump() | self.env.get_template_vars() | self.model.get_template_vars()
+        template_vars = template_vars | kwargs
         return Template(template, undefined=StrictUndefined).render(
-            **kwargs, **template_vars, **self.extra_template_vars
+            **template_vars, **self.extra_template_vars
         )
 
     def add_message(self, role: str, content: str, **kwargs):
@@ -81,39 +83,51 @@ class DefaultAgent:
 
     def step(self) -> dict:
         """Query the LM, execute the action, return the observation."""
-        return self.get_observation(self.query())
+        return self.get_observation(self.query(), allowed_tools=self.config.tools)
 
-    def query(self, allowed_tools: list[ToolDescription] | None = None, messages: list[dict] | None = None) -> dict:
+    def update_allowed_tools(self, messages, allowed_tools):
+        messages[1]['content'] = self.render_template(self.config.instance_template, tools=allowed_tools)
+
+    def query(self, allowed_tools: Optional[list[ToolDescription]] = None, messages: Optional[list[dict]] = None) -> dict:
         """Query the model and return the response."""
         messages = messages or self.messages
+        allowed_tools = allowed_tools or self.config.tools
+        self.update_allowed_tools(messages, allowed_tools=allowed_tools)
         if 0 < self.config.step_limit <= self.model.n_calls or 0 < self.config.cost_limit <= self.model.cost:
             raise LimitsExceeded()
         response = self.model.query(messages)
-        self.add_message("assistant", **response)
+        self.add_message("assistant", allowed_tools=allowed_tools, **response)
         return response
 
-    def get_observation(self, response: dict) -> dict:
+    def get_observation(self, response: dict, allowed_tools: Optional[list[ToolDescription]] = None) -> dict:
         """Execute the action and return the observation."""
-        output = self.execute_action(self.parse_action(response))
+        output = self.execute_action(self.parse_action(response, allowed_tools))
         observation = self.render_template(self.config.action_observation_template, output=output)
         self.add_message("user", observation)
         return output
 
-    def parse_action(self, response: dict) -> dict:
+    def parse_action(self, response: dict, allowed_tools: Optional[list[ToolDescription]] = None) -> dict:
         """Parse the action from the message. Returns the action."""
         actions = re.findall(self.config.action_regex, response["content"], re.DOTALL)
         if len(actions) == 1:
+            if allowed_tools and not actions[0].strip().split()[0] in [tool['name'] for tool in allowed_tools]:
+                raise FormatError("I can't execute this command because it is not from thhe allowed list.")
             return {"action": actions[0].strip(), **response}
         raise FormatError(self.render_template(self.config.format_error_template, actions=actions))
 
     def execute_action(self, action: dict) -> dict:
         try:
             output = self.env.execute(action["action"])
-        except (TimeoutError, subprocess.TimeoutExpired) as e:
+        except subprocess.TimeoutExpired as e:
             output = e.output.decode("utf-8", errors="replace") if getattr(e, "output", None) else ""
             raise ExecutionTimeoutError(
                 self.render_template(self.config.timeout_template, action=action, output=output)
             )
+        except TimeoutError as e:
+            raise ExecutionTimeoutError(
+                self.render_template(self.config.timeout_template, action=action, output="")
+            )
+
         self.has_finished(output)
         return output | {"action": action["action"]}
 

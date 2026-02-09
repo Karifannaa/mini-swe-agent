@@ -7,21 +7,22 @@ There are three modes:
 """
 
 import re
-from typing import Literal
+from typing import Literal, Optional
 
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.shortcuts import PromptSession
 from rich.console import Console
 from rich.rule import Rule
 
-from minisweagent import global_config_dir
+from minisweagent import ToolDescription, global_config_dir
 from minisweagent.agents.default import AgentConfig, DefaultAgent, LimitsExceeded, NonTerminatingException, Submitted
+from minisweagent.agents.long_context import AgentLongContextConfig, LongContextAgent
 
 console = Console(highlight=False)
 prompt_session = PromptSession(history=FileHistory(global_config_dir / "interactive_history.txt"))
 
 
-class InteractiveAgentConfig(AgentConfig):
+class InteractiveAgentConfig(AgentLongContextConfig):
     mode: Literal["human", "confirm", "yolo"] = "confirm"
     """Whether to confirm actions."""
     whitelist_actions: list[str] = []
@@ -30,7 +31,7 @@ class InteractiveAgentConfig(AgentConfig):
     """If the agent wants to finish, do we ask for confirmation from user?"""
 
 
-class InteractiveAgent(DefaultAgent):
+class InteractiveAgent(LongContextAgent):
     _MODE_COMMANDS_MAPPING = {"/u": "human", "/c": "confirm", "/y": "yolo"}
 
     def __init__(self, *args, config_class=InteractiveAgentConfig, **kwargs):
@@ -50,7 +51,7 @@ class InteractiveAgent(DefaultAgent):
             console.print(f"\n[bold green]{role.capitalize()}[/bold green]:\n", end="", highlight=False)
         console.print(content, highlight=False, markup=False)
 
-    def query(self) -> dict:
+    def query(self, allowed_tools: Optional[list[ToolDescription]] = None, messages: Optional[list[dict]] = None) -> dict:
         # Extend supermethod to handle human mode
         if self.config.mode == "human":
             match command := self._prompt_and_handle_special("[bold yellow]>[/bold yellow] "):
@@ -62,7 +63,7 @@ class InteractiveAgent(DefaultAgent):
                     return msg
         try:
             with console.status("Waiting for the LM to respond..."):
-                return super().query()
+                return super().query(allowed_tools, messages)
         except LimitsExceeded:
             console.print(
                 f"Limits exceeded. Limits: {self.config.step_limit} steps, ${self.config.cost_limit}.\n"
@@ -70,7 +71,7 @@ class InteractiveAgent(DefaultAgent):
             )
             self.config.step_limit = int(input("New step limit: "))
             self.config.cost_limit = float(input("New cost limit: "))
-            return super().query()
+            return super().query(allowed_tools, messages)
 
     def step(self) -> dict:
         # Override the step method to handle user interruption

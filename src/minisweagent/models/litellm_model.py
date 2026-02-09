@@ -18,7 +18,7 @@ from tenacity import (
 from minisweagent.models import GLOBAL_MODEL_STATS
 from minisweagent.models.utils.cache_control import set_cache_control
 
-logger = logging.getLogger("litellm_model")
+logger = logging.getLogger("minisweagent")
 
 
 class LitellmModelConfig(BaseModel):

@@ -58,7 +58,7 @@ def save_traj(
         data["info"]["model_stats"]["api_calls"] = agent.model.n_calls
         data["messages"] = agent.messages
         if is_agent_with_summary_messages(agent):
-            data["summary_messages"] = agent.summary_messages
+            data["summary_messages"] = [msg.model_dump() for msg in  agent.summary_messages]
         data["info"]["config"] = {
             "agent": agent.config.model_dump(),
             "model": agent.model.config.model_dump(),

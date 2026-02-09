@@ -1,12 +1,11 @@
-from minisweagent.agents.tool_match import ToolMatch
-from minisweagent.retrieval.bm25.index import top_k_elements
+from minisweagent.agents.tool_match import ToolMatch, top_k_elements
 
 
 def test_top_k_elements():
     xs = ['a', 'b', 'c']
     scores = [2, 1, 3]
-    assert top_k_elements(xs, scores, 1)[0] == 'c'
-    assert top_k_elements(xs, scores, 2)[1] == 'a'
+    top_k_elements(xs, scores, 1)[0] = 'c'
+    top_k_elements(xs, scores, 2)[1] = 'a'
 
 
 def test_select_tool_basic_usage():

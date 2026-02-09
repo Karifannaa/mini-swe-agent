@@ -12,12 +12,13 @@ __version__ = "1.17.3"
 
 import os
 from pathlib import Path
-from typing import Any, NotRequired, Protocol
+from typing import Any, Optional, Protocol, NotRequired
+from pydantic import BaseModel, ConfigDict
+from typing_extensions import TypedDict
 
 import dotenv
 from platformdirs import user_config_dir
 from rich.console import Console
-from typing_extensions import TypedDict
 
 from minisweagent.utils.log import logger
 
@@ -71,8 +72,6 @@ class Agent(Protocol):
 
     def run(self, task: str, **kwargs) -> tuple[str, str]: ...
 
-class AgentEx(Agent, Protocol):
-    summary_messages: list[dict[str, str]]
 
 
 class ToolDescription(TypedDict):
@@ -80,7 +79,14 @@ class ToolDescription(TypedDict):
     description: str
     prompt_instruction: NotRequired[str]
 
+class AbstractMessage(BaseModel):
+    model_config = ConfigDict(extra='allow')
+    role: str
+    content: str
+    original_message: dict | None
 
+class AgentEx(Agent, Protocol):
+    summary_messages: list[AbstractMessage]
 
 __all__ = [
     "Agent",
@@ -92,5 +98,6 @@ __all__ = [
     "global_config_file",
     "global_config_dir",
     "logger",
-    "ToolDescription"
+    "ToolDescription",
+    "AbstractMessage"
 ]

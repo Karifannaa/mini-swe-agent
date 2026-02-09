@@ -1,6 +1,5 @@
 from minisweagent.agents.history_retrieval import HistoryRetriever
 
-
 def test_retrieve_bash_tool_usage_with_query():
     """Test retrieving history for bash tool usage with combined step text + tool description."""
 
